@@ -1,0 +1,22 @@
+services:
+  fsp2mqtt:
+    build: .
+    container_name: fsp2mqtt
+    restart: unless-stopped
+    env_file: .env
+    # Internal bridge shared with the broker: reach it by name `mqtt`, no LAN IP,
+    # no macvlan. Egress (if ever needed) goes out via the host IP (NAT).
+    networks:
+      - mqtt_net
+    # CP2112 HID-to-I2C bridge (FSP Twin PSU PMBus). Adjust if the bus index changes.
+    devices:
+      - /dev/i2c-5:/dev/i2c-5
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  mqtt_net:
+    external: true
