@@ -8,8 +8,16 @@ services:
     # no macvlan. Egress (if ever needed) goes out via the host IP (NAT).
     networks:
       - mqtt_net
-    # CP2112 HID-to-I2C bridge (FSP Twin PSU PMBus). Adjust if the bus index changes.
+    # CP2112 HID-to-I2C bridge (FSP Twin PSU PMBus). The kernel I2C bus index of the
+    # CP2112 is NOT stable across reboots (USB enumeration order shifts it among the
+    # GPU/PIIX4 adapters), so we map every i2c bus and let I2C_BUS=auto find the
+    # "CP2112 SMBus Bridge" adapter via /sys. The GPU buses are harmless extras.
     devices:
+      - /dev/i2c-0:/dev/i2c-0
+      - /dev/i2c-1:/dev/i2c-1
+      - /dev/i2c-2:/dev/i2c-2
+      - /dev/i2c-3:/dev/i2c-3
+      - /dev/i2c-4:/dev/i2c-4
       - /dev/i2c-5:/dev/i2c-5
     logging:
       driver: "json-file"
