@@ -50,6 +50,36 @@ POLL_INTERVAL = int(os.environ.get("POLL_INTERVAL", "15"))
 
 AVAIL_TOPIC = f"{STATE_PREFIX}/availability"
 
+# Last availability we asserted on the broker. Kept at module level so on_connect()
+# can re-assert it after a reconnection (see publish_avail below).
+_avail = {"state": None}
+
+
+def publish_avail(client, state):
+    """Publish the retained availability, only when it actually changes.
+
+    Returns True if the value changed, so the caller can log the transition.
+
+    The last asserted value is remembered because the LWT is retained: when the
+    connection drops (broker restart, network blip) the broker publishes a
+    retained "offline". paho reconnects on its own, but without this bookkeeping
+    nothing would ever overwrite that retained "offline" — the bridge would keep
+    streaming PSU readings while every consumer saw it as down.
+    """
+    if _avail["state"] == state:
+        return False
+    _avail["state"] = state
+    client.publish(AVAIL_TOPIC, state, qos=1, retain=True)
+    return True
+
+
+def on_connect(client, userdata, flags, rc, properties=None):
+    """Re-assert the current availability on every successful (re)connection."""
+    if _avail["state"] is not None:
+        client.publish(AVAIL_TOPIC, _avail["state"], qos=1, retain=True)
+        log(f"[mqtt] (re)connected -> re-asserted {_avail['state']}")
+
+
 # PMBus command codes
 VOUT_MODE = 0x20
 STATUS_WORD = 0x79
@@ -224,12 +254,12 @@ def main():
     if MQTT_USER:
         client.username_pw_set(MQTT_USER, MQTT_PASS)
     client.will_set(AVAIL_TOPIC, "offline", qos=1, retain=True)
+    client.on_connect = on_connect
     client.connect(MQTT_HOST, MQTT_PORT, keepalive=60)
     client.loop_start()
     log(f"[mqtt] connected to {MQTT_HOST}:{MQTT_PORT} as {MQTT_USER}")
 
     discovery_sent = False
-    online = None
     n_modules = len(PSU_ADDRESSES)
 
     try:
@@ -247,9 +277,7 @@ def main():
             present = {i: r for i, r in results.items() if r is not None}
 
             if not present:
-                if online is not False:
-                    client.publish(AVAIL_TOPIC, "offline", qos=1, retain=True)
-                    online = False
+                if publish_avail(client, "offline"):
                     log("[psu] no module readable -> offline")
                 time.sleep(POLL_INTERVAL)
                 continue
@@ -259,9 +287,7 @@ def main():
                 discovery_sent = True
                 log(f"[discovery] published for {n_modules} modules")
 
-            if online is not True:
-                client.publish(AVAIL_TOPIC, "online", qos=1, retain=True)
-                online = True
+            if publish_avail(client, "online"):
                 log("[psu] readable -> online")
 
             total_pout = 0.0
