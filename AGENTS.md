@@ -4,7 +4,7 @@ Bridge from an FSP "Twin" redundant power supply (e.g. FSP930-20REB) to MQTT in
 the Home Assistant discovery format. It reads the PMBus telemetry of the two
 hot-swap modules through a Silicon Labs CP2112 USB-to-I2C bridge and publishes
 retained state plus discovery configs; any MQTT consumer can use the same
-topics.
+topics. Public open-source project, MIT licensed.
 
 ## Tech Stack
 
@@ -26,6 +26,7 @@ fsp2mqtt/
 ├── docker-compose.yml - service fsp2mqtt: mqtt_net network, i2c device nodes
 ├── .env.example - configuration template (copy to .env, gitignored)
 ├── README.md - user overview: addresses, topics, requirements
+├── LICENSE - MIT
 ├── scripts/
 │   └── doc_check.py - documentation staleness check
 └── .githooks/

@@ -48,3 +48,7 @@ bridge that can reach your broker also works).
 docker logs -f fsp2mqtt
 mosquitto_sub -h <broker> -u <user> -P '<pwd>' -t 'fsp/#' -v
 ```
+
+## License
+
+MIT — see [LICENSE](LICENSE).
