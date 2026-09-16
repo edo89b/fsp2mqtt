@@ -166,11 +166,12 @@ while the bridge is down; every other entity uses `<STATE_PREFIX>/availability`.
    `FileNotFoundError` for that node. Remedy: keep `I2C_BUS=auto` (the adapter
    is found by name in `/sys`) and make sure the index is among the `devices:`
    mapped in `docker-compose.yml`; add it if it is higher than 5.
-2. **Crash loop at host boot.** If the broker is not resolvable yet, `connect()`
-   raises `socket.gaierror: [Errno -3] Temporary failure in name resolution`
-   and the process exits; the restart policy retries until the broker is up
-   (about two minutes seen). Act only if it persists: check the broker and the
-   `mqtt_net` network.
+2. **Broker not up at host boot.** Until 16/09/2026 `connect()` raised
+   `socket.gaierror: [Errno -3] Temporary failure in name resolution` and the
+   process exited, so the restart policy looped (10 restarts on 24/08). Now
+   `connect_async()` retries by itself (1-60 s) and the process waits up to
+   `MQTT_CONNECT_WAIT` (300 s) before going on. If `[mqtt] connected` never
+   shows up, check the broker and the `mqtt_net` network.
 3. **Rejected MQTT login is silent.** `[mqtt] connected to ...` is logged as
    soon as the TCP connection opens; `on_connect` ignores the reason code, so
    wrong credentials show no error here. Check the broker log.

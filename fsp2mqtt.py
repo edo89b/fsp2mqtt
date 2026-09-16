@@ -34,6 +34,7 @@ PSU_ADDRESSES = [int(x, 0) for x in os.environ.get("PSU_ADDRESSES", "0x58,0x59")
 
 MQTT_HOST = os.environ.get("MQTT_HOST", "mqtt")
 MQTT_PORT = int(os.environ.get("MQTT_PORT", "1883"))
+MQTT_CONNECT_WAIT = 300  # seconds waited for the first connection before going on
 MQTT_USER = os.environ.get("MQTT_USER", "fsp2mqtt")
 MQTT_PASS = os.environ.get("MQTT_PASS", "")
 MQTT_CLIENT = os.environ.get("MQTT_CLIENT", "fsp2mqtt")
@@ -255,8 +256,18 @@ def main():
         client.username_pw_set(MQTT_USER, MQTT_PASS)
     client.will_set(AVAIL_TOPIC, "offline", qos=1, retain=True)
     client.on_connect = on_connect
-    client.connect(MQTT_HOST, MQTT_PORT, keepalive=60)
+    # connect_async + retry: a broker that is not up (or not yet resolvable) at start
+    # used to kill the process, and Docker restarted it in a loop until the broker came
+    # back. Now paho keeps retrying, including the very first connection.
+    client.reconnect_delay_set(min_delay=1, max_delay=60)
+    client.connect_async(MQTT_HOST, MQTT_PORT, keepalive=60)
     client.loop_start()
+    # Wait for the first connection before publishing: QoS 0 messages sent while
+    # disconnected would be dropped silently.
+    for _ in range(MQTT_CONNECT_WAIT):
+        if client.is_connected():
+            break
+        time.sleep(1)
     log(f"[mqtt] connected to {MQTT_HOST}:{MQTT_PORT} as {MQTT_USER}")
 
     discovery_sent = False
